@@ -5,7 +5,7 @@ module Resque
 
     # A multiple failure backend, with retry suppression
     #
-    # For example: if you had a job that could retry 5 times, your failure 
+    # For example: if you had a job that could retry 5 times, your failure
     # backends are not notified unless the _final_ retry attempt also fails.
     #
     # Example:
@@ -17,7 +17,6 @@ module Resque
     #   Resque::Failure.backend = Resque::Failure::MultipleWithRetrySuppression
     #
     class MultipleWithRetrySuppression < Multiple
-      include Resque::Helpers
 
       # Called when the job fails
       #
@@ -53,6 +52,36 @@ module Resque
       end
 
       protected
+
+      # pulled from Resque::Helpers
+      # I believe we can just use string.constantize in rails 3, but this isn't a rails-only gem...
+
+      def classify(dashed_word)
+        dashed_word.split('-').each { |part| part[0] = part[0].chr.upcase }.join
+      end
+
+      def constantize(camel_cased_word)
+        camel_cased_word = camel_cased_word.to_s
+
+        if camel_cased_word.include?('-')
+          camel_cased_word = classify(camel_cased_word)
+        end
+
+        names = camel_cased_word.split('::')
+        names.shift if names.empty? || names.first.empty?
+
+        constant = Object
+        names.each do |name|
+          args = Module.method(:const_get).arity != 1 ? [false] : []
+
+          if constant.const_defined?(name, *args)
+            constant = constant.const_get(name)
+          else
+            constant = constant.const_missing(name)
+          end
+        end
+        constant
+      end
 
       # Return the class/module of the failed job.
       def klass
